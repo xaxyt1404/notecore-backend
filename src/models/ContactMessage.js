@@ -16,6 +16,9 @@ const contactMessageSchema = new mongoose.Schema(
       enum: ["pending", "resolved"],
       default: "pending",
     },
+    adminReply: { type: String, default: "", trim: true },
+    repliedAt: { type: Date, default: null },
+    userReadReply: { type: Boolean, default: false },
   },
   { timestamps: true },
 );

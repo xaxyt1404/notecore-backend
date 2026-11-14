@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
 import Subject from "../models/Subject.js";
@@ -118,6 +119,77 @@ export const loginUser = async (req, res, next) => {
       return res
         .status(401)
         .json({ ok: false, message: "Correo o contraseña incorrectos." });
+    }
+
+    const subjects = await Subject.find({ user: user._id }).sort({
+      createdAt: 1,
+    });
+
+    res.json({
+      ok: true,
+      token: generateToken(user._id),
+      user: user.toJSON(),
+      subjects: subjects.map((s) => s.toJSON()),
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// POST /api/auth/google
+export const googleLogin = async (req, res, next) => {
+  try {
+    const { accessToken } = req.body;
+    if (!accessToken) {
+      return res
+        .status(400)
+        .json({ ok: false, message: "Falta el token de Google." });
+    }
+
+    const googleRes = await fetch(
+      "https://www.googleapis.com/oauth2/v3/userinfo",
+      {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      },
+    );
+
+    if (!googleRes.ok) {
+      return res
+        .status(401)
+        .json({ ok: false, message: "Token de Google inválido." });
+    }
+
+    const googleData = await googleRes.json();
+    const email = (googleData.email || "").toLowerCase().trim();
+    if (!email) {
+      return res.status(400).json({
+        ok: false,
+        message: "No se pudo obtener el correo de Google.",
+      });
+    }
+
+    // Se ignora googleData.picture explícitamente para no recibir ni guardar foto de perfil
+    let user = await User.findOne({ email });
+    if (!user) {
+      user = await User.create({
+        firstName: (
+          googleData.given_name ||
+          googleData.name ||
+          "Estudiante"
+        ).trim(),
+        lastName: (googleData.family_name || "").trim() || "NoteCore",
+        email,
+        password: crypto.randomBytes(24).toString("hex"),
+        university: "Universidad de Cartagena",
+        degree: "",
+        avatar: "",
+        role: "student",
+        roleLabel: "Estudiante Universitario",
+        semester: {
+          period: getAutoSemesterName(),
+          schema: "30-30-40",
+        },
+      });
     }
 
     const subjects = await Subject.find({ user: user._id }).sort({

@@ -13,8 +13,12 @@ const userSchema = new mongoose.Schema(
       trim: true,
     },
     password: { type: String, required: true, minlength: 6 },
-    university: { type: String, required: true, trim: true },
-    degree: { type: String, required: true, trim: true },
+    university: {
+      type: String,
+      default: "Universidad de Cartagena",
+      trim: true,
+    },
+    degree: { type: String, default: "", trim: true },
     avatar: { type: String, default: "" },
     role: {
       type: String,

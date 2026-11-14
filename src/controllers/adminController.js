@@ -24,12 +24,10 @@ export const createUniversity = async (req, res, next) => {
       programs = [],
     } = req.body;
     if (!name?.trim()) {
-      return res
-        .status(400)
-        .json({
-          ok: false,
-          message: "El nombre de la institución es obligatorio.",
-        });
+      return res.status(400).json({
+        ok: false,
+        message: "El nombre de la institución es obligatorio.",
+      });
     }
 
     const uni = await University.create({
@@ -108,6 +106,82 @@ export const getAdminOverview = async (req, res, next) => {
       users: users.map((u) => u.toJSON()),
       messages: messages.map((m) => m.toJSON()),
       universities: universities.map((u) => u.toJSON()),
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// PATCH /api/admin/users/:id
+export const updateUserByAdmin = async (req, res, next) => {
+  try {
+    const targetUser = await User.findById(req.params.id);
+    if (!targetUser) {
+      return res
+        .status(404)
+        .json({ ok: false, message: "Usuario no encontrado." });
+    }
+    if (targetUser.role === "admin") {
+      return res
+        .status(403)
+        .json({
+          ok: false,
+          message:
+            "No puedes modificar una cuenta de administrador desde aquí.",
+        });
+    }
+
+    const { firstName, lastName, email, university, degree } = req.body;
+
+    if (email && email.toLowerCase().trim() !== targetUser.email) {
+      const emailTaken = await User.findOne({
+        email: email.toLowerCase().trim(),
+      });
+      if (emailTaken) {
+        return res
+          .status(400)
+          .json({ ok: false, message: "Ese correo ya está en uso." });
+      }
+      targetUser.email = email.toLowerCase().trim();
+    }
+
+    if (firstName !== undefined) targetUser.firstName = firstName.trim();
+    if (lastName !== undefined) targetUser.lastName = lastName.trim();
+    if (university !== undefined) targetUser.university = university.trim();
+    if (degree !== undefined) targetUser.degree = degree.trim();
+
+    await targetUser.save();
+    res.json({ ok: true, user: targetUser.toJSON() });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// DELETE /api/admin/users/:id
+export const deleteUserByAdmin = async (req, res, next) => {
+  try {
+    const targetUser = await User.findById(req.params.id);
+    if (!targetUser) {
+      return res
+        .status(404)
+        .json({ ok: false, message: "Usuario no encontrado." });
+    }
+    if (targetUser.role === "admin") {
+      return res
+        .status(403)
+        .json({
+          ok: false,
+          message: "No puedes eliminar una cuenta de administrador.",
+        });
+    }
+
+    await Subject.deleteMany({ user: targetUser._id });
+    await User.findByIdAndDelete(targetUser._id);
+
+    res.json({
+      ok: true,
+      id: req.params.id,
+      message: "Usuario y asignaturas eliminados.",
     });
   } catch (error) {
     next(error);

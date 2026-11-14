@@ -1,5 +1,11 @@
 import Subject from "../models/Subject.js";
 
+const GEMINI_MODELS = [
+  "gemini-3.8-flash",
+  "gemini-3.6-flash",
+  "gemini-3.5-flash-lite",
+];
+
 const buildAcademicSummary = (user, subjects) => {
   if (!subjects.length) {
     return `${user.firstName} aún no tiene asignaturas registradas en el sistema.`;
@@ -72,22 +78,38 @@ export const chatWithCoreAI = async (req, res, next) => {
       const context = buildAcademicSummary(req.user, subjects);
       const prompt = `Eres CoreAI, el asistente académico de la plataforma NoteCore. Responde en español, de forma cercana, breve (máximo 4 líneas) y práctica usando los datos reales del estudiante.\n\nEstudiante: ${req.user.firstName} ${req.user.lastName} (${req.user.university} - ${req.user.degree})\nAsignaturas:\n${context}\n\nPregunta del estudiante: ${message.trim()}`;
 
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-          }),
-        },
-      );
+      for (const model of GEMINI_MODELS) {
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-goog-api-key": apiKey,
+            },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+            }),
+          },
+        );
 
-      if (response.ok) {
-        const data = await response.json();
-        const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (reply) {
-          return res.json({ ok: true, reply: reply.trim(), source: "gemini" });
+        if (response.ok) {
+          const data = await response.json();
+          const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (reply) {
+            console.log(`🤖 CoreAI respondió con ${model}`);
+            return res.json({
+              ok: true,
+              reply: reply.trim(),
+              source: "gemini",
+            });
+          }
+        } else {
+          const errText = await response.text();
+          console.error(
+            `❌ Error Gemini [${model}] (${response.status}):`,
+            errText,
+          );
         }
       }
     }
